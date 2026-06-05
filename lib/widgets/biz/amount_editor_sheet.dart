@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:decimal/decimal.dart';
 import 'package:flutter_cloud_sync/flutter_cloud_sync.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:beecount/widgets/ui/wheel_date_picker.dart';
@@ -224,6 +225,9 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
   // 运算缓存：支持简单 + / - 键入累计
   double _acc = 0;
   String? _op; // 最近一次运算符，null 表示尚未进入运算模式
+  // 两个运算符键各自独立的模式(false=加/减,true=乘/除),长按各自切换,互不影响。
+  bool _mulKey1 = false; // 键1:+ ↔ ×
+  bool _mulKey2 = false; // 键2:− ↔ ÷
 
   // 高频备注列表（包含使用次数）
   List<({String note, int count})> _frequentNotes = [];
@@ -353,6 +357,47 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
     }
   }
 
+  /// 用 Decimal 精确运算(避免浮点漂移,如 0.1+0.2),左到右无运算符优先级,
+  /// 除零保护;结果四舍五入到最多两位小数(金额精度)。
+  double _compute(double a, String op, double b) {
+    final da = Decimal.parse(a.toStringAsFixed(2));
+    final db = Decimal.parse(b.toStringAsFixed(2));
+    final Decimal r;
+    switch (op) {
+      case '+':
+        r = da + db;
+        break;
+      case '-':
+        r = da - db;
+        break;
+      case '×':
+        r = da * db;
+        break;
+      case '÷':
+        if (db == Decimal.zero) return a; // 除零保护:保持被除数不变
+        r = (da.toRational() / db.toRational())
+            .toDecimal(scaleOnInfinitePrecision: 12);
+        break;
+      default:
+        return b;
+    }
+    return r.round(scale: 2).toDouble();
+  }
+
+  /// 运算符显示字形(减号用真减号 −,而非连字符 -)。
+  String _opGlyph(String op) {
+    switch (op) {
+      case '-':
+        return '−';
+      case '×':
+        return '×';
+      case '÷':
+        return '÷';
+      default:
+        return '+';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
@@ -369,10 +414,9 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
       if (_op == null) {
         // 首次点击运算符，将当前值存入累加器
         _acc = cur;
-      } else if (_op == '+') {
-        _acc += cur;
-      } else if (_op == '-') {
-        _acc -= cur;
+      } else {
+        // 左到右:先把上一个运算符算掉
+        _acc = _compute(_acc, _op!, cur);
       }
       _op = op;
       _amountStr = '0';
@@ -385,12 +429,7 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
     void applyEquals() {
       if (_op == null) return; // 没有运算符，不执行
       final cur = parsed();
-      double total = _acc;
-      if (_op == '+') {
-        total += cur;
-      } else if (_op == '-') {
-        total -= cur;
-      }
+      final total = _compute(_acc, _op!, cur);
       // 格式化结果
       final s = total.abs().toStringAsFixed(2);
       final trimmed = s.contains('.')
@@ -422,6 +461,64 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
                   color: fg ?? BeeTokens.textPrimary(context),
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 运算符键:同时显示「加减」与「乘除」两组运算符;当前激活的一组用主色高亮、
+    // 另一组用次级色弱化(主次区分,也作为"长按可切到乘除"的提示)。单击应用激活
+    // 运算符,长按切换加减 ↔ 乘除。
+    Widget opKey(String addSubOp, String mulDivOp, bool isMul,
+        VoidCallback onToggle) {
+      final activeOp = isMul ? mulDivOp : addSubOp;
+      // 激活的运算符与数字键完全一致(字号 18 / w600),保证视觉粗细相同 —— 字号
+      // 更大即使同 weight 笔画也会更粗。未激活更小(14)+ 灰色以分主次。
+      TextStyle opStyle(bool active) => text.titleMedium!.copyWith(
+            color: active
+                ? BeeTokens.textPrimary(context)
+                : BeeTokens.textTertiary(context),
+            fontSize: active ? 18 : 14,
+            fontWeight: FontWeight.w600,
+          );
+      return Padding(
+        padding: const EdgeInsets.all(6),
+        child: Material(
+          color: BeeTokens.surfaceKeySecondary(context),
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => applyOp(activeOp),
+            // 双击 / 长按都是「切到另一组运算符并直接应用」(一步用上另一个);
+            // applyOp 内部已带触感/声音。
+            onDoubleTap: () {
+              onToggle();
+              applyOp(isMul ? addSubOp : mulDivOp);
+            },
+            onLongPress: () {
+              onToggle();
+              applyOp(isMul ? addSubOp : mulDivOp);
+            },
+            child: SizedBox(
+              height: 60,
+              // 「加减/乘除」中间一个斜杠分隔;单击用激活运算符,长按只切换本键(两键独立)。
+              child: Center(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: _opGlyph(addSubOp), style: opStyle(!isMul)),
+                    TextSpan(
+                      text: '/',
+                      style: text.titleMedium!.copyWith(
+                        color: BeeTokens.textTertiary(context),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    TextSpan(text: _opGlyph(mulDivOp), style: opStyle(isMul)),
+                  ]),
                 ),
               ),
             ),
@@ -479,7 +576,7 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Text(
-                          _op == '-' ? '−' : '+',
+                          _opGlyph(_op!),
                           style: text.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: primary,
@@ -514,7 +611,7 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
                       Text(
                         (() {
                           final cur = parsed();
-                          final total = _op == '+' ? _acc + cur : _acc - cur;
+                          final total = _compute(_acc, _op!, cur);
                           final s = total.abs().toStringAsFixed(2);
                           final r1 = s.contains('.')
                               ? s.replaceFirst(RegExp(r'0+$'), '')
@@ -684,14 +781,7 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
               Widget doneKey() {
                 // 计算当前总额以判断是否启用完成按钮
                 final cur = parsed();
-                double total;
-                if (_op == '+') {
-                  total = _acc + cur;
-                } else if (_op == '-') {
-                  total = _acc - cur;
-                } else {
-                  total = cur;
-                }
+                final total = _op == null ? cur : _compute(_acc, _op!, cur);
 
                 // 判断是否处于运算模式
                 final isInCalcMode = _op != null;
@@ -787,8 +877,8 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
                         child: keyBtn('6', onTap: () => _append('6'))),
                     SizedBox(
                         width: w,
-                        child: keyBtn('+',
-                            bg: BeeTokens.surfaceKeySecondary(context), onTap: () => applyOp('+'))),
+                        child: opKey('+', '×', _mulKey1,
+                            () => setState(() => _mulKey1 = !_mulKey1))),
                   ]),
                   const SizedBox(height: 2),
                   Row(children: [
@@ -803,8 +893,8 @@ class _AmountEditorSheetState extends ConsumerState<AmountEditorSheet> {
                         child: keyBtn('3', onTap: () => _append('3'))),
                     SizedBox(
                         width: w,
-                        child: keyBtn('-',
-                            bg: BeeTokens.surfaceKeySecondary(context), onTap: () => applyOp('-'))),
+                        child: opKey('-', '÷', _mulKey2,
+                            () => setState(() => _mulKey2 = !_mulKey2))),
                   ]),
                   const SizedBox(height: 2),
                   Row(children: [
