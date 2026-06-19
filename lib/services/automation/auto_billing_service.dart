@@ -140,11 +140,11 @@ class AutoBillingService {
     _lastProcessedPath = imagePath;
     _lastProcessedTime = now;
 
-    try {
-      const notificationId = 1001;
-      // 最终结果(成功/失败)用独立 ID,避免 iOS 把它当成对 1001 的静默更新
-      const resultNotificationId = 1101;
+    const notificationId = 1001;
+    // 最终结果(成功/失败)用独立 ID,避免 iOS 把它当成对 1001 的静默更新
+    const resultNotificationId = 1101;
 
+    try {
       // 检查文件是否存在
       final file = File(imagePath);
 
@@ -298,11 +298,17 @@ class AutoBillingService {
         if (showNotification) {
           final l10n =
               lookupAppLocalizations(PlatformDispatcher.instance.locale);
+          // failedCount>0:提取到账单但入库失败(真·错误);否则=AI 判定不是账单
+          final isNoBill = result.failedCount == 0;
           await _showFinalNotification(
             progressId: notificationId,
             finalId: resultNotificationId,
-            title: l10n.autoBillingNotifyRecognizeFailedTitle,
-            body: l10n.autoBillingNotifyRecognizeFailedBody,
+            title: isNoBill
+                ? l10n.autoBillingNotifyNoBillTitle
+                : l10n.autoBillingNotifyRecognizeFailedTitle,
+            body: isNoBill
+                ? l10n.autoBillingNotifyNoBillBody
+                : l10n.autoBillingNotifyRecognizeFailedBody,
           );
         }
         return null;
@@ -331,6 +337,18 @@ class AutoBillingService {
         'error': e.toString(),
         'stage': '未知阶段',
       }, stackTrace);
+      if (showNotification) {
+        try {
+          final l10n =
+              lookupAppLocalizations(PlatformDispatcher.instance.locale);
+          await _showFinalNotification(
+            progressId: notificationId,
+            finalId: resultNotificationId,
+            title: l10n.autoBillingNotifyRecognizeFailedTitle,
+            body: l10n.autoBillingNotifyRecognizeFailedBody,
+          );
+        } catch (_) {}
+      }
       return null;
     } finally {
       final totalElapsed =

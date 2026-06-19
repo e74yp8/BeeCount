@@ -7662,6 +7662,12 @@ abstract class AppLocalizations {
   /// **'Recognition failed. Check logs for details.'**
   String get aiOcrCheckLog;
 
+  /// No description provided for @aiOcrNoBill.
+  ///
+  /// In en, this message translates to:
+  /// **'No bill recognized. Make sure the image is a bill, then try again.'**
+  String get aiOcrNoBill;
+
   /// No description provided for @aiNotConfiguredNotificationTitle.
   ///
   /// In en, this message translates to:
@@ -7721,6 +7727,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not extract billing info from screenshot. Check AI config or the image.'**
   String get autoBillingNotifyRecognizeFailedBody;
+
+  /// No description provided for @autoBillingNotifyNoBillTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No bill found'**
+  String get autoBillingNotifyNoBillTitle;
+
+  /// No description provided for @autoBillingNotifyNoBillBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No billing info found in this screenshot — it may not be a bill.'**
+  String get autoBillingNotifyNoBillBody;
 
   /// No description provided for @autoBillingNotifyFileUnavailableTitle.
   ///

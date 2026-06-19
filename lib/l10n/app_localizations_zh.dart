@@ -4010,6 +4010,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiOcrCheckLog => '识别失败，请查看日志了解详情';
 
   @override
+  String get aiOcrNoBill => '未识别到账单信息，请确认图片是账单后重试';
+
+  @override
   String get aiNotConfiguredNotificationTitle => '❌ 无法识别截图';
 
   @override
@@ -4038,6 +4041,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get autoBillingNotifyRecognizeFailedBody => '无法从截图提取账单信息，请检查 AI 配置或图片';
+
+  @override
+  String get autoBillingNotifyNoBillTitle => '未识别到账单';
+
+  @override
+  String get autoBillingNotifyNoBillBody => '这张截图未识别到账单信息，可能不是账单';
 
   @override
   String get autoBillingNotifyFileUnavailableTitle => '识别失败';
@@ -10787,6 +10796,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get aiOcrCheckLog => '識別失敗，請查看日誌瞭解詳情';
 
   @override
+  String get aiOcrNoBill => '未識別到帳單資訊，請確認圖片是帳單後重試';
+
+  @override
   String get aiNotConfiguredNotificationTitle => '❌ 無法識別截圖';
 
   @override
@@ -10815,6 +10827,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get autoBillingNotifyRecognizeFailedBody => '無法從截圖提取帳單資訊，請檢查 AI 配置或圖片';
+
+  @override
+  String get autoBillingNotifyNoBillTitle => '未識別到帳單';
+
+  @override
+  String get autoBillingNotifyNoBillBody => '這張截圖未識別到帳單資訊，可能不是帳單';
 
   @override
   String get autoBillingNotifyFileUnavailableTitle => '識別失敗';

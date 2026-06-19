@@ -4010,6 +4010,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiOcrCheckLog => 'Recognition failed. Check logs for details.';
 
   @override
+  String get aiOcrNoBill => 'No bill recognized. Make sure the image is a bill, then try again.';
+
+  @override
   String get aiNotConfiguredNotificationTitle => '❌ Cannot recognize screenshot';
 
   @override
@@ -4038,6 +4041,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoBillingNotifyRecognizeFailedBody => 'Could not extract billing info from screenshot. Check AI config or the image.';
+
+  @override
+  String get autoBillingNotifyNoBillTitle => 'No bill found';
+
+  @override
+  String get autoBillingNotifyNoBillBody => 'No billing info found in this screenshot — it may not be a bill.';
 
   @override
   String get autoBillingNotifyFileUnavailableTitle => 'Recognition failed';
